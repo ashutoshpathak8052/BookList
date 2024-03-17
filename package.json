@@ -28,7 +28,8 @@
     "jest": "^29.6.3",
     "prettier": "2.8.8",
     "react-test-renderer": "18.2.0",
-    "typescript": "5.0.4"
+    "typescript": "5.0.4",
+    "react-native-fast-image": "^8.6.3"
   },
   "engines": {
     "node": ">=18"

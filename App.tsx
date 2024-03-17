@@ -1,118 +1,154 @@
-/**
- * Sample React Native App
- * https://github.com/facebook/react-native
- *
- * @format
- */
+import React, { useState, useEffect } from 'react';
+import { View, Text, FlatList, Image, TextInput, StyleSheet, TouchableOpacity, AsyncStorage } from 'react-native';
+import FastImage from 'react-native-fast-image';
 
-import React from 'react';
-import type {PropsWithChildren} from 'react';
-import {
-  SafeAreaView,
-  ScrollView,
-  StatusBar,
-  StyleSheet,
-  Text,
-  useColorScheme,
-  View,
-} from 'react-native';
+const BookList = () => {
+  const [books, setBooks] = useState([]);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [favorites, setFavorites] = useState([]);
 
-import {
-  Colors,
-  DebugInstructions,
-  Header,
-  LearnMoreLinks,
-  ReloadInstructions,
-} from 'react-native/Libraries/NewAppScreen';
+  useEffect(() => {
+    fetchBooks();
+    loadFavorites();
+  }, []);
 
-type SectionProps = PropsWithChildren<{
-  title: string;
-}>;
+  const fetchBooks = async () => {
+    try {
+      const response = await fetch('https://openlibrary.org/subjects/sci-fi.json?details=true');
+      const data = await response.json();
+      setBooks(data.works);
+    } catch (error) {
+      console.error('Error fetching data:', error);
+    }
+  };
 
-function Section({children, title}: SectionProps): React.JSX.Element {
-  const isDarkMode = useColorScheme() === 'dark';
-  return (
-    <View style={styles.sectionContainer}>
-      <Text
-        style={[
-          styles.sectionTitle,
-          {
-            color: isDarkMode ? Colors.white : Colors.black,
-          },
-        ]}>
-        {title}
-      </Text>
-      <Text
-        style={[
-          styles.sectionDescription,
-          {
-            color: isDarkMode ? Colors.light : Colors.dark,
-          },
-        ]}>
-        {children}
-      </Text>
-    </View>
-  );
-}
+  const loadFavorites = async () => {
+    try {
+      const storedFavorites = await AsyncStorage.getItem('favorites');
+      if (storedFavorites !== null) {
+        setFavorites(JSON.parse(storedFavorites));
+      }
+    } catch (error) {
+      console.error('Error loading favorites:', error);
+    }
+  };
 
-function App(): React.JSX.Element {
-  const isDarkMode = useColorScheme() === 'dark';
+  const saveFavorites = async () => {
+    try {
+      await AsyncStorage.setItem('favorites', JSON.stringify(favorites));
+    } catch (error) {
+      console.error('Error saving favorites:', error);
+    }
+  };
 
-  const backgroundStyle = {
-    backgroundColor: isDarkMode ? Colors.darker : Colors.lighter,
+  const toggleFavorite = (item) => {
+    const index = favorites.findIndex(book => book.key === item.key);
+    if (index === -1) {
+      setFavorites([...favorites, item]);
+    } else {
+      const updatedFavorites = favorites.filter(book => book.key !== item.key);
+      setFavorites(updatedFavorites);
+    }
+  };
+
+  const isFavorite = (item) => {
+    return favorites.some(book => book.key === item.key);
+  };
+
+  const handleSearch = async () => {
+    if (!searchQuery.trim()) {
+      fetchBooks();
+      return;
+    }
+    try {
+      const response = await fetch(`https://openlibrary.org/search.json?title=${encodeURIComponent(searchQuery)}`);
+      const data = await response.json();
+      setBooks(data.docs);
+    } catch (error) {
+      console.error('Error fetching search results:', error);
+    }
   };
 
   return (
-    <SafeAreaView style={backgroundStyle}>
-      <StatusBar
-        barStyle={isDarkMode ? 'light-content' : 'dark-content'}
-        backgroundColor={backgroundStyle.backgroundColor}
+    <View style={styles.container}>
+      <TextInput
+        style={styles.searchInput}
+        placeholder="Search by title..."
+        value={searchQuery}
+        onChangeText={setSearchQuery}
+        onSubmitEditing={handleSearch}
       />
-      <ScrollView
-        contentInsetAdjustmentBehavior="automatic"
-        style={backgroundStyle}>
-        <Header />
-        <View
-          style={{
-            backgroundColor: isDarkMode ? Colors.black : Colors.white,
-          }}>
-          <Section title="Step One">
-            Edit <Text style={styles.highlight}>App.tsx</Text> to change this
-            screen and then come back to see your edits.
-          </Section>
-          <Section title="See Your Changes">
-            <ReloadInstructions />
-          </Section>
-          <Section title="Debug">
-            <DebugInstructions />
-          </Section>
-          <Section title="Learn More">
-            Read the docs to discover what to do next:
-          </Section>
-          <LearnMoreLinks />
-        </View>
-      </ScrollView>
-    </SafeAreaView>
+      <FlatList
+        data={books}
+        keyExtractor={(item, index) => index.toString()}
+        renderItem={({ item }) => (
+          <TouchableOpacity style={styles.bookItem} onPress={() => toggleFavorite(item)}>
+            <FastImage
+              source={{ uri: `https://covers.openlibrary.org/b/id/${item.cover_i}-L.jpg` }}
+              style={styles.coverImage}
+            />
+            <View style={styles.bookDetails}>
+              <Text style={styles.title}>{item.title}</Text>
+              <Text style={styles.author}>Author(s): {item.author_name ? item.author_name.join(', ') : 'N/A'}</Text>
+              <Text style={styles.year}>Publication Year: {item.first_publish_year ? item.first_publish_year : 'N/A'}</Text>
+            </View>
+            {isFavorite(item) ? (
+              <Text style={styles.favoriteText}>❤️</Text>
+            ) : (
+              <Text style={styles.favoriteText}>🤍</Text>
+            )}
+          </TouchableOpacity>
+        )}
+      />
+    </View>
   );
-}
+};
 
 const styles = StyleSheet.create({
-  sectionContainer: {
-    marginTop: 32,
-    paddingHorizontal: 24,
+  container: {
+    flex: 1,
+    backgroundColor: '#f0f0f0',
+    padding: 10,
   },
-  sectionTitle: {
-    fontSize: 24,
-    fontWeight: '600',
+  searchInput: {
+    height: 40,
+    borderColor: '#ccc',
+    borderWidth: 1,
+    borderRadius: 5,
+    paddingHorizontal: 10,
+    marginBottom: 10,
   },
-  sectionDescription: {
-    marginTop: 8,
-    fontSize: 18,
-    fontWeight: '400',
+  bookItem: {
+    flexDirection: 'row',
+    backgroundColor: '#fff',
+    borderRadius: 5,
+    marginBottom: 10,
+    padding: 10,
+    alignItems: 'center',
   },
-  highlight: {
-    fontWeight: '700',
+  coverImage: {
+    width: 80,
+    height: 120,
+    marginRight: 10,
+  },
+  bookDetails: {
+    flex: 1,
+  },
+  title: {
+    fontSize: 16,
+    fontWeight: 'bold',
+    marginBottom: 5,
+  },
+  author: {
+    fontSize: 14,
+    marginBottom: 3,
+  },
+  year: {
+    fontSize: 14,
+  },
+  favoriteText: {
+    fontSize: 20,
   },
 });
 
-export default App;
+export default BookList;
